@@ -8,21 +8,32 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
-      - run: docker build -t vasuvirat492/docker-react -f Dockerfile.dev .
-      - run: docker run -e CI=true vasuvirat492/docker-react npm test
- 
-      - name: Generate deployment package
-        run: zip -r deploy.zip . -x '*.git*'
- 
+      - name: Checkout Latest Repo
+        uses: actions/checkout@master
+
+      - name: Generate Deployment Package 
+        run: zip -r deploy.zip * -x "**node_modules**"
+
+      - name: Get timestamp
+        uses: gerred/actions/current-time@master
+        id: current-time
+      
+      - name: Run string replace
+        uses: frabert/replace-string-action@master
+        id: format-time
+        with:
+          pattern: '[:\.]+'
+          string: "${{ steps.current-time.outputs.time }}"
+          replace-with: '-'
+          flags: 'g'
+      
       - name: Deploy to EB
-        uses: einaregilsson/beanstalk-deploy@v20
+        uses: einaregilsson/beanstalk-deploy@v14
         with:
           aws_access_key: ${{ secrets.AWS_ACCESS_KEY }}
           aws_secret_key: ${{ secrets.AWS_SECRET_KEY }}
           application_name: docker-react
           environment_name: Dockerreact-env
+          version_label: "docker-react-${{ steps.format-time.outputs.replaced }}"
           region: ap-south-1
-          version_label: ${{ github.sha }}
           deployment_package: deploy.zip
